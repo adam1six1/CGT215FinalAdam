@@ -12,10 +12,10 @@ using namespace sfp;
 void DoInput(PhysicsCircle& player) {
 	Vector2f velocity = player.getVelocity();
 	if (Keyboard::isKeyPressed(Keyboard::Right)) {
-		velocity.x = 0.3;
+		//velocity.x = 0.3;
 	}
 	else if (Keyboard::isKeyPressed(Keyboard::Left)) {
-		velocity.x = -0.3;
+		//velocity.x = -0.3;
 	}
 	else {
 		velocity.x = 0;
@@ -23,6 +23,10 @@ void DoInput(PhysicsCircle& player) {
 	velocity.y = player.getVelocity().y;
 
 	player.setVelocity(velocity);
+
+	if (Keyboard::isKeyPressed(Keyboard::Up)) {
+		player.applyImpulse(Vector2f(0, -0.005));
+	}
 }
 
 float randomFloat(float min, float max) {
@@ -36,13 +40,14 @@ int main()
 {
 	//create window
     RenderWindow window(VideoMode(800, 600), "Falling Ball");
-    World world(Vector2f(0, 1));
+    World world(Vector2f(0, 0.2));
     int score(0);
 
 	//Create Player
     PhysicsCircle player;
-    player.setCenter(Vector2f(400, 200));
+    player.setCenter(Vector2f(100, 250));
     player.setRadius(20);
+	player.setRestitution(0.5);
 	player.setFillColor(Color(0, 217, 255));
     world.AddPhysicsBody(player);
 
@@ -62,6 +67,22 @@ int main()
 	celing.setFillColor(Color(255, 0, 0));
 	world.AddPhysicsBody(celing);
 
+	//left wall
+	PhysicsRectangle leftWall;
+	leftWall.setSize(Vector2f(10, 600));
+	leftWall.setCenter(Vector2f(-200, 300));
+	leftWall.setStatic(true);
+	leftWall .setFillColor(Color(0, 0, 0));
+	world.AddPhysicsBody(leftWall);
+
+	/*temporary floor
+	PhysicsRectangle tempFloor;
+	tempFloor.setSize(Vector2f(800, 40));
+	tempFloor.setCenter(Vector2f(400, 300));
+	tempFloor.setStatic(true);
+	world.AddPhysicsBody(tempFloor);
+	*/
+
 	floor.onCollision = [&player]
 	(PhysicsBodyCollisionResult result) {
 		//cout << "hit" << endl;
@@ -76,12 +97,14 @@ int main()
 
 	//Platform spawn setup
 	float platformHeight = 600; //platform spawn Y location
-	float platformSpawn = 1.5; //platform spawn target time
-	float platformTime = platformSpawn;
+	float platformSpawn = 2.5; //platform spawn target time
+	float platformTime = platformSpawn - 0.1;
+	float platformSpeed = 3;
 
 	float randomPosition = 100;
+	bool gameOver = false;
 
-	while (true) {
+	while (gameOver == false) {
 		// calculate MS since last frame
 		currentTime = clock.getElapsedTime();
 		Time deltaTime = currentTime - lastTime;
@@ -93,34 +116,48 @@ int main()
 
 			platformTime += deltaTime.asSeconds();
 
-			for (PhysicsShape& platformL : platforms) {
-				float newY = platformL.getCenter().y;
-				float currX = platformL.getCenter().x;
-				newY += -1;
-				platformL.setCenter(Vector2f(currX, newY));
+			for (PhysicsShape& platform : platforms) {
+				float newX = platform.getCenter().x;
+				float currY = platform.getCenter().y;
+				newX -= platformSpeed;
+				platform.setCenter(Vector2f(newX, currY));
 			}
+
+			player.onCollision =
+				[&celing, &gameOver, &floor]
+				(PhysicsBodyCollisionResult result) {
+				if (
+					(result.object2 == celing) || 
+					(result.object2 == floor)
+					) {
+					gameOver = true;
+				}
+				};
 
 			if (platformTime > platformSpawn) {
 				platformTime = 0;
 				
-				randomPosition = randomFloat(60, 540);
+				randomPosition = randomFloat(100, 500);
 
 				PhysicsRectangle& platformL = platforms.Create();
-				platformL.setSize(Vector2f(800, 40));
-				platformL.setCenter(Vector2f(randomPosition - 500, 600));
+				platformL.setSize(Vector2f(100, 600));
+				platformL.setCenter(Vector2f(900, randomPosition - 400));
 				platformL.setStatic(true);
 				world.AddPhysicsBody(platformL);
 
 				PhysicsRectangle& platformR = platforms.Create();
-				platformR.setSize(Vector2f(800, 40));
-				platformR.setCenter(Vector2f(randomPosition + 500, 600));
+				platformR.setSize(Vector2f(100, 600));
+				platformR.setCenter(Vector2f(900, randomPosition + 400));
 				platformR.setStatic(true);
 				world.AddPhysicsBody(platformR);
 
 				platformL.onCollision =
-					[&celing, &world, &platforms, &platformL]
+					[&celing, &world, &platforms, &platformL, &leftWall, &player, &gameOver]
 					(PhysicsBodyCollisionResult result) {
-					if (result.object2 == celing) {
+					if (result.object2 == player) {
+						gameOver = true;
+					}
+					else if (result.object2 == leftWall) {
 						world.RemovePhysicsBody(platformL);
 						platforms.QueueRemove(platformL);
 					}
@@ -128,9 +165,12 @@ int main()
 
 
 				platformR.onCollision =
-					[&celing, &world, &platforms, &platformR]
+					[&celing, &world, &platforms, &platformR, &leftWall, &player, &gameOver]
 					(PhysicsBodyCollisionResult result) {
-					if (result.object2 == celing) {
+					if (result.object2 == player) {
+						gameOver = true;
+					}
+					else if (result.object2 == leftWall) {
 						world.RemovePhysicsBody(platformR);
 						platforms.QueueRemove(platformR);
 					}
@@ -148,12 +188,18 @@ int main()
 			window.draw((PhysicsSprite&)platformR);
 		}
 
+		window.draw(leftWall);
 		window.draw(player);
 		window.draw(floor);
 		window.draw(celing);
 
 		window.display();
 	}
+	cout << "gameOver" << endl;
+	while (true) {
+
+	}
+
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
