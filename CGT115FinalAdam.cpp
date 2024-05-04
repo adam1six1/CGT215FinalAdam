@@ -25,7 +25,7 @@ void DoInput(PhysicsCircle& player) {
 	player.setVelocity(velocity);
 
 	if (Keyboard::isKeyPressed(Keyboard::Up)) {
-		player.applyImpulse(Vector2f(0, -0.005));
+		player.applyImpulse(Vector2f(0, -0.05));
 	}
 }
 
@@ -40,7 +40,7 @@ int main()
 {
 	//create window
     RenderWindow window(VideoMode(800, 600), "Falling Ball");
-    World world(Vector2f(0, 0.2));
+    World world(Vector2f(0, 0.6));
     int score(0);
 
 	//Create Player
@@ -48,7 +48,7 @@ int main()
     player.setCenter(Vector2f(100, 250));
     player.setRadius(20);
 	player.setRestitution(0.5);
-	player.setFillColor(Color(0, 217, 255));
+	player.setFillColor(Color(114, 25, 90));
     world.AddPhysicsBody(player);
 
 	// Create the floor
@@ -56,7 +56,7 @@ int main()
 	floor.setSize(Vector2f(800, 100));
 	floor.setCenter(Vector2f(400, 590));
 	floor.setStatic(true);
-	floor.setFillColor(Color(255, 0, 0));
+	floor.setFillColor(Color(126, 127, 154));
 	world.AddPhysicsBody(floor);
 
 	//Create Celing
@@ -64,7 +64,7 @@ int main()
 	celing.setSize(Vector2f(800, 40));
 	celing.setCenter(Vector2f(400, 10));
 	celing.setStatic(true);
-	celing.setFillColor(Color(255, 0, 0));
+	celing.setFillColor(Color(126, 127, 154));
 	world.AddPhysicsBody(celing);
 
 	//left wall
@@ -89,6 +89,13 @@ int main()
 		};
 
 	PhysicsShapeList<PhysicsRectangle> platforms;
+	PhysicsShapeList<PhysicsRectangle> coins;
+
+	Font fnt;
+	if (!fnt.loadFromFile("skeleboom.ttf")) {
+		cout << "Could not load font." << endl;
+		exit(3);
+	}
 
 	//setup timer
 	Clock clock;
@@ -103,6 +110,8 @@ int main()
 
 	float randomPosition = 100;
 	bool gameOver = false;
+
+	int points = 0;
 
 	while (gameOver == false) {
 		// calculate MS since last frame
@@ -123,8 +132,15 @@ int main()
 				platform.setCenter(Vector2f(newX, currY));
 			}
 
+			for (PhysicsShape& coin : coins) {
+				float newX = coin.getCenter().x;
+				float currY = coin.getCenter().y;
+				newX -= platformSpeed;
+				coin.setCenter(Vector2f(newX, currY));
+			}
+
 			player.onCollision =
-				[&celing, &gameOver, &floor]
+				[&celing, &gameOver, &floor, &coins]
 				(PhysicsBodyCollisionResult result) {
 				if (
 					(result.object2 == celing) || 
@@ -142,14 +158,23 @@ int main()
 				PhysicsRectangle& platformL = platforms.Create();
 				platformL.setSize(Vector2f(100, 600));
 				platformL.setCenter(Vector2f(900, randomPosition - 400));
+				platformL.setFillColor(Color(202, 231, 185));
 				platformL.setStatic(true);
 				world.AddPhysicsBody(platformL);
 
 				PhysicsRectangle& platformR = platforms.Create();
 				platformR.setSize(Vector2f(100, 600));
 				platformR.setCenter(Vector2f(900, randomPosition + 400));
+				platformR.setFillColor(Color(202, 231, 185));
 				platformR.setStatic(true);
 				world.AddPhysicsBody(platformR);
+
+				PhysicsRectangle& coin = coins.Create();
+				coin.setSize(Vector2f(50, 50));
+				coin.setCenter(Vector2f(900, randomPosition));
+				coin.setFillColor(Color(243, 222, 138));
+				coin.setStatic(true);
+				world.AddPhysicsBody(coin);
 
 				platformL.onCollision =
 					[&celing, &world, &platforms, &platformL, &leftWall, &player, &gameOver]
@@ -175,10 +200,25 @@ int main()
 						platforms.QueueRemove(platformR);
 					}
 					};
+
+				coin.onCollision =
+					[&world, &leftWall, &player, &coin, &coins, &points]
+					(PhysicsBodyCollisionResult result) {
+					if (result.object2 == player) {
+						world.RemovePhysicsBody(coin);
+						coins.QueueRemove(coin);
+						points += 1;
+						cout << points << endl;
+					}
+					else if (result.object2 == leftWall) {
+						world.RemovePhysicsBody(coin);
+						coins.QueueRemove(coin);
+					}
+					};
 			}
 		}
 
-		window.clear(Color(0, 0, 0));
+		window.clear(Color(151, 167, 179));
 
 		platforms.DoRemovals();
 		for (PhysicsShape& platformL : platforms) {
@@ -188,14 +228,36 @@ int main()
 			window.draw((PhysicsSprite&)platformR);
 		}
 
+		coins.DoRemovals();
+		for (PhysicsShape& coin : coins) {
+			window.draw((PhysicsSprite&)coin);
+		}
+
 		window.draw(leftWall);
 		window.draw(player);
 		window.draw(floor);
 		window.draw(celing);
 
+		Text scoreText;
+		scoreText.setString("Points: " + to_string(points));
+		scoreText.setFont(fnt);
+		scoreText.setPosition(Vector2f(20, 550));
+		scoreText.setFillColor(Color(243, 222, 138));
+		window.draw(scoreText);
+
 		window.display();
 	}
 	cout << "gameOver" << endl;
+
+	Text gameOverText;
+	gameOverText.setString("GAME OVER");
+	gameOverText.setFont(fnt);
+	gameOverText.setPosition(200, 250);
+	gameOverText.setCharacterSize(75);
+	gameOverText.setFillColor(Color(114, 25, 90));
+	window.draw(gameOverText);
+	window.display();
+
 	while (true) {
 
 	}
